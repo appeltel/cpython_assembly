@@ -91,6 +91,7 @@ class Assembler:
         else:
             self.src = {}
 
+        self.targets = {}
         self.code = None
         self.varnames = varnames
 
@@ -131,7 +132,6 @@ class Assembler:
         self.consts = tuple(consts)
         self.consts_alias = aliases
 
-
     def assemble_code(self):
         """
         Assuming everything else has gone correctly, produce the bytecode
@@ -139,6 +139,11 @@ class Assembler:
         bytecode = []
         pos = 0
         for line in self.src['code']:
+
+            line = self._extract_target(line, pos)
+            if not line:
+                continue
+
             tokens = line.split()
             op = tokens[0].upper()
             opcode = opmap[op]
@@ -147,8 +152,21 @@ class Assembler:
                 bytecode.append(int(tokens[1]))
             else:
                 bytecode.append(0)
+            pos += 2
 
         self.code = bytes(bytecode)
+
+    def _extract_target(self, line, pos):
+        """
+        Extract a target (if any) from the line and return what remains.
+        Add the target position to the dict of targets.
+        """
+        tokens = line.split(':')
+        if len(tokens) == 1:
+            return line
+        target, ops = tokens
+        self.targets[target] = pos
+        return ops
 
 
 if __name__ == '__main__':

@@ -42,6 +42,21 @@ def test_assemble_code():
     assert machine.code == b'|\x00d\x01\x17\x00S\x00'
 
 
+def test_assemble_code_targets():
+    machine = asm.Assembler()
+    machine.src['code'] = [
+        'foo: LOAD_FAST 0',
+        'LOAD_CONST 1',
+        'bar:',
+        'binary_add',
+        'baz: RETURN_VALUE'
+    ]
+
+    machine.assemble_code()
+    assert machine.code == b'|\x00d\x01\x17\x00S\x00'
+    assert machine.targets == {'foo': 0, 'bar': 4, 'baz': 6}
+
+
 def test_assemble_consts():
     machine = asm.Assembler()
     machine.src['consts'] = [
