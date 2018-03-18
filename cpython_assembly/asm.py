@@ -54,6 +54,9 @@ def asm(f):
 def preprocess(source):
     """
     Remove comments, dedent, split into lines and sections
+
+    allow first line of section to be after the section header,
+    for example ``.stacksize 4``
     """
     lines = [line.split(';')[0].strip() for line in source.splitlines()]
     sections = {'unknown': []}
@@ -62,8 +65,11 @@ def preprocess(source):
         if not line:
             continue
         if line.startswith('.'):
-                sections[line[1:]] = []
-                current_section = line[1:]
+                tokens = line[1:].split()
+                sections[tokens[0]] = []
+                current_section = tokens[0]
+                if len(tokens) > 1:
+                    sections[tokens[0]].append(''.join(tokens[1:]))
                 continue
         sections[current_section].append(line)
 

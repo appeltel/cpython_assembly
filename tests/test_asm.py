@@ -5,16 +5,13 @@ import cpython_assembly.asm as asm
 
 SAMPLE_CODE = """\
 
-.stacksize  ; maybe reformat this
-   2
+.stacksize  2   ;comment
 
 .consts
    4
 
-.varnames
-   x
 ; line with comment
-.code
+.code;comment
    LOAD_FAST 0
    LOAD_CONST 1
    BINARY_ADD
@@ -29,8 +26,8 @@ def test_preprocess():
     assert result['code'][0] == 'LOAD_FAST 0'
     assert result['code'][3] == 'RETURN_VALUE'
     assert len(result['code']) == 4
-    assert result['varnames'] == ['x']
-
+    assert result['consts'] == ['4']
+    assert result['stacksize'] == ['2']
 
 def test_assemble_code():
     machine = asm.Assembler()
