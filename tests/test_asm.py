@@ -44,3 +44,16 @@ def test_assemble_code():
     machine.assemble_code()
     assert machine.code == b'|\x00d\x01\x17\x00S\x00'
 
+
+def test_assemble_consts():
+    machine = asm.Assembler()
+    machine.src['consts'] = [
+        'four = 4',
+        '23.2',
+        'string =     "foo" + "bar"'
+    ]
+
+    machine.assemble_consts()
+
+    assert machine.consts == (None, 4, 23.2, "foobar")
+    assert machine.consts_alias == {'none': 0, 'four': 1, 'string': 3}

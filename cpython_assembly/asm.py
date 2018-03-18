@@ -13,7 +13,7 @@ def asm(f):
     doc, source = f.__doc__.split(':::asm')
     co_in = f.__code__
 
-    sections = preprocess(source)
+    co_out = Assembler(source, co_in.co_varnames)
 
     argcount = 1
     kwonlyargcount = 0
@@ -87,6 +87,37 @@ class Assembler:
 
         self.code = None
         self.varnames = varnames
+
+    def assemble(self):
+        """
+        Assemble source into a types.CodeType object and return it
+        """
+        self.assemble_consts()
+        self.assemble_code()
+        
+    def assemble_consts(self):
+        """
+        Consts must be in the .consts section one per line in
+        the form ``name=expression`` to give an alias to the constant
+        or just ``expression`` if you don't care to give it an alias
+        and refer to it numerically in the assembly code.
+
+        As with the CPython compiler, the first constant in the list
+        will always be None. This will be given the alias "none"
+        """
+        consts = [None]
+        aliases = {'none': 0}
+        for idx, line in enumerate(self.src['consts']):
+            tokens = [t.strip() for t in line.split('=')]
+            if len(tokens) == 1:
+                consts.append(eval(tokens[0]))
+            else:
+                consts.append(eval(tokens[1]))
+                aliases[tokens[0].lower()] = idx + 1
+
+        self.consts = tuple(consts)
+        self.consts_alias = aliases
+
 
     def assemble_code(self):
         """
