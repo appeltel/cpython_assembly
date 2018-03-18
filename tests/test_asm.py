@@ -30,3 +30,17 @@ def test_preprocess():
     assert result['code'][3] == 'RETURN_VALUE'
     assert len(result['code']) == 4
     assert result['varnames'] == ['x']
+
+
+def test_assemble_code():
+    machine = asm.Assembler()
+    machine.src['code'] = [
+        'LOAD_FAST (x)',
+        'LOAD_CONST (4)',
+        'binary_add',
+        'RETURN_VALUE'
+    ]
+
+    machine.assemble_code()
+    assert machine.code == b'|\x00d\x00\x17\x00S\x00'
+

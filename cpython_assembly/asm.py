@@ -2,8 +2,8 @@
 Let's do this!
 
 """
+from dis import opmap
 import types
-
 
 def asm(f):
     """
@@ -68,6 +68,36 @@ def preprocess(source):
         sections[current_section].append(line)
 
     return sections
+
+
+class Assembler:
+    """
+    I *think* I want to make this a class
+    """
+    def __init__(self, source=None):
+        """
+        Can be passed source to be preprocessed or
+        you can add sections manually (mainly for
+        testing convenience) 
+        """
+        if source is not None:
+            self.src = preprocess(source)
+        else:
+            self.src = {}
+
+        self.code = None
+
+    def assemble_code(self):
+        """
+        Assuming everything else has gone correctly, produce the bytecode
+        """
+        bytecode = []
+        for line in self.src['code']:
+            tokens = line.split()
+            bytecode.append(opmap[tokens[0].upper()])
+            bytecode.append(0)
+
+        self.code = bytes(bytecode)
 
 
 if __name__ == '__main__':
