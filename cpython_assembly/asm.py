@@ -2,7 +2,7 @@
 Let's do this!
 
 """
-from dis import opmap
+from dis import opmap, HAVE_ARGUMENT
 import types
 
 def asm(f):
@@ -74,7 +74,7 @@ class Assembler:
     """
     I *think* I want to make this a class
     """
-    def __init__(self, source=None):
+    def __init__(self, source=None, varnames=()):
         """
         Can be passed source to be preprocessed or
         you can add sections manually (mainly for
@@ -86,16 +86,23 @@ class Assembler:
             self.src = {}
 
         self.code = None
+        self.varnames = varnames
 
     def assemble_code(self):
         """
         Assuming everything else has gone correctly, produce the bytecode
         """
         bytecode = []
+        pos = 0
         for line in self.src['code']:
             tokens = line.split()
-            bytecode.append(opmap[tokens[0].upper()])
-            bytecode.append(0)
+            op = tokens[0].upper()
+            opcode = opmap[op]
+            bytecode.append(opcode)
+            if opcode >= HAVE_ARGUMENT:
+                bytecode.append(int(tokens[1]))
+            else:
+                bytecode.append(0)
 
         self.code = bytes(bytecode)
 
