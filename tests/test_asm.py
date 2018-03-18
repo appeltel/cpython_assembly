@@ -54,3 +54,11 @@ def test_assemble_consts():
 
     assert machine.consts == (None, 4, 23.2, "foobar")
     assert machine.consts_alias == {'none': 0, 'four': 1, 'string': 3}
+
+def test_assemble_stacksize():
+    machine = asm.Assembler()
+    machine.src['stacksize'] = ['10']
+
+    machine.assemble_stacksize()
+
+    assert machine.stacksize == 10

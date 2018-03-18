@@ -100,6 +100,13 @@ class Assembler:
         """
         self.assemble_consts()
         self.assemble_code()
+
+    def assemble_stacksize(self):
+        """
+        obviously - come back to this when its time to
+        add reasonable error messages
+        """
+        self.stacksize = int(self.src['stacksize'][0])
         
     def assemble_consts(self):
         """
