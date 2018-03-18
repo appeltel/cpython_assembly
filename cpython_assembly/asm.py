@@ -2,7 +2,7 @@
 Let's do this!
 
 """
-from dis import opmap, HAVE_ARGUMENT
+from dis import opmap, HAVE_ARGUMENT, hasjrel, hasjabs
 import types
 
 def asm(f):
@@ -149,12 +149,31 @@ class Assembler:
             opcode = opmap[op]
             bytecode.append(opcode)
             if opcode >= HAVE_ARGUMENT:
-                bytecode.append(int(tokens[1]))
+                bytecode.append(self._determine_argument(tokens[1], opcode))
             else:
                 bytecode.append(0)
             pos += 2
 
+        self.bytecode = bytecode
+        self._fix_targets()
+
         self.code = bytes(bytecode)
+
+    def _determine_argument(self, arg, opcode):
+        """
+        Determine what to do with an argument string depending on the opcode
+
+        If the argument is an integer convert and return it
+        """
+        try:
+            return int(arg)
+        except ValueError:
+            pass
+
+        if opcode in hasjabs:
+            return ('jabs', arg)
+        if opcode in hasjrel:
+            return ('jrel', arg) 
 
     def _extract_target(self, line, pos):
         """
@@ -168,6 +187,22 @@ class Assembler:
         self.targets[target] = pos
         return ops
 
+    def _fix_targets(self):
+        """
+        Replace target tuples in bytecode with correct positions
+        """
+        print(self.bytecode)
+        for idx in range(0, len(self.bytecode), 2):
+            if not isinstance(self.bytecode[idx+1], tuple):
+                continue
+            if self.bytecode[idx+1][0] == 'jabs':
+                self.bytecode[idx+1] = self.targets[self.bytecode[idx+1][1]]
+                continue
+            if self.bytecode[idx+1][0] == 'jrel':
+                self.bytecode[idx+1] = (
+                    self.targets[self.bytecode[idx+1][1]] - (idx + 2)
+                )
+        print(self.bytecode)
 
 if __name__ == '__main__':
 

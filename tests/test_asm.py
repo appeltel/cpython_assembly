@@ -57,6 +57,30 @@ def test_assemble_code_targets():
     assert machine.targets == {'foo': 0, 'bar': 4, 'baz': 6}
 
 
+def test_assemble_code_target_positions():
+    machine = asm.Assembler()
+    machine.src['code'] = [
+        '  SETUP_LOOP              after_loop',
+        'start_loop:',
+        '  LOAD_FAST               0',
+        '  LOAD_CONST              1',
+        '  COMPARE_OP               4', 
+        '  POP_JUMP_IF_FALSE       end_loop',
+        '  LOAD_FAST                0',
+        '  LOAD_CONST               2',
+        '  INPLACE_SUBTRACT',
+        '  STORE_FAST               0',
+        '  JUMP_ABSOLUTE            start_loop',
+        'end_loop:  POP_BLOCK',
+        'after_loop:',
+        '  LOAD_FAST                0',
+        '  RETURN_VALUE'
+    ]
+
+    machine.assemble_code()
+
+    assert machine.code == b'x\x14|\x00d\x01k\x04r\x14|\x00d\x028\x00}\x00q\x02W\x00|\x00S\x00'
+
 def test_assemble_consts():
     machine = asm.Assembler()
     machine.src['consts'] = [
