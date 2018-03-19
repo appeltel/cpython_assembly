@@ -2,7 +2,9 @@
 Let's do this!
 
 """
-from dis import opmap, HAVE_ARGUMENT, hasjrel, hasjabs
+from dis import (
+    opmap, HAVE_ARGUMENT, hasjrel, hasjabs, haslocal, hasname, hasconst
+)
 import types
 
 def asm(f):
@@ -13,18 +15,18 @@ def asm(f):
     doc, source = f.__doc__.split(':::asm')
     co_in = f.__code__
 
-    co_out = Assembler(source, co_in.co_varnames)
+    machine = Assembler(source, co_in.co_varnames)
+    co_gen = machine.assemble()
 
     argcount = 1
     kwonlyargcount = 0
     nlocals = 1
-    stacksize = 2
+    stacksize = co_gen.co_stacksize
     flags = 67
-    codestring = b'|\x00d\x01\x17\x00S\x00'
-    constants = (None, 4)
-    names = ()
-    varnames = co_in.co_varnames
-    filename = co_in.co_filename
+    codestring = co_gen.co_code
+    constants = co_gen.co_consts
+    names = co_gen.co_names
+    varnames = co_gen.co_varnames
     name = co_in.co_name
     filename = co_in.co_filename
     firstlineno = co_in.co_firstlineno
@@ -48,6 +50,7 @@ def asm(f):
 
     result = types.FunctionType(co_out, globals())
     result.__doc__ = doc
+    result.__defaults__ = f.__defaults__
     return result
 
 
@@ -94,13 +97,33 @@ class Assembler:
         self.targets = {}
         self.code = None
         self.varnames = varnames
+        self.locals = list(varnames)
 
     def assemble(self):
         """
         Assemble source into a types.CodeType object and return it
         """
+        self.assemble_stacksize()
+        self.assemble_locals()
+        self.assemble_names()
         self.assemble_consts()
         self.assemble_code()
+
+        return types.CodeType(
+            len(self.varnames),
+            0,
+            0,
+            self.stacksize,
+            67,
+            self.code,
+            self.consts,
+            self.names,
+            self.varnames,
+            '',
+            '',
+            0,
+            b''
+        )
 
     def assemble_stacksize(self):
         """
@@ -132,6 +155,27 @@ class Assembler:
         self.consts = tuple(consts)
         self.consts_alias = aliases
 
+    def assemble_locals(self):
+        """
+        Local variables in addition to parameters
+
+        These can be multiple on one line, comma separated
+        """
+        for line in self.src.get('locals', ()):
+            self.locals.extend([s.strip() for s in line.split(',')])
+        self.varnames = tuple(self.locals)
+
+    def assemble_names(self):
+        """
+        Names
+
+        These can be multiple on one line, comma separated
+        """
+        names = []
+        for line in self.src.get('names', ()):
+            names.extend([s.strip() for s in line.split(',')])
+        self.names = tuple(names)
+
     def assemble_code(self):
         """
         Assuming everything else has gone correctly, produce the bytecode
@@ -155,7 +199,7 @@ class Assembler:
             pos += 2
 
         self.bytecode = bytecode
-        self._fix_targets()
+        self._fix_arguments()
 
         self.code = bytes(bytecode)
 
@@ -173,7 +217,13 @@ class Assembler:
         if opcode in hasjabs:
             return ('jabs', arg)
         if opcode in hasjrel:
-            return ('jrel', arg) 
+            return ('jrel', arg)
+        if opcode in haslocal:
+            return ('local', arg)
+        if opcode in hasname:
+            return ('name', arg)
+        if opcode in hasconst:
+            return ('const', arg)
 
     def _extract_target(self, line, pos):
         """
@@ -187,33 +237,61 @@ class Assembler:
         self.targets[target] = pos
         return ops
 
-    def _fix_targets(self):
+    def _fix_arguments(self):
         """
-        Replace target tuples in bytecode with correct positions
+        Replace target tuples in bytecode with correct positions or
+        variable indices
         """
-        print(self.bytecode)
         for idx in range(0, len(self.bytecode), 2):
-            if not isinstance(self.bytecode[idx+1], tuple):
+            arg = self.bytecode[idx+1]
+            if not isinstance(arg, tuple):
                 continue
-            if self.bytecode[idx+1][0] == 'jabs':
-                self.bytecode[idx+1] = self.targets[self.bytecode[idx+1][1]]
-                continue
-            if self.bytecode[idx+1][0] == 'jrel':
+            if arg[0] == 'jabs':
+                self.bytecode[idx+1] = self.targets[arg[1]]
+            elif arg[0] == 'jrel':
                 self.bytecode[idx+1] = (
-                    self.targets[self.bytecode[idx+1][1]] - (idx + 2)
+                    self.targets[arg[1]] - (idx + 2)
                 )
-        print(self.bytecode)
+            elif arg[0] == 'local':
+                self.bytecode[idx+1] = self.locals.index(arg[1])
+            elif arg[0] == 'name':
+                self.bytecode[idx+1] = self.names.index(arg[1])
+            elif arg[0] == 'const':
+                self.bytecode[idx+1] = self.consts_alias[arg[1]]
+
 
 if __name__ == '__main__':
 
     @asm
-    def testfunc():
+    def testfunc(x):
         """
-        Some docstring
-
+        Subtract 3 from x until it is less than 4, then
+        return the result
         :::asm
 
-        Some code
+        .stacksize 2
+        .consts
+           four=4
+           three=3
+
+        .code
+           SETUP_LOOP               after_loop
+        start_loop:
+           LOAD_FAST                x
+           LOAD_CONST               four
+           COMPARE_OP               4
+           POP_JUMP_IF_FALSE        end_loop
+
+           LOAD_FAST                x
+           LOAD_CONST               three
+           INPLACE_SUBTRACT
+           STORE_FAST               x
+           JUMP_ABSOLUTE            start_loop
+        end_loop: 
+           POP_BLOCK
+        after_loop:
+           LOAD_FAST                x
+           RETURN_VALUE
         """
 
-    print(testfunc(4))
+    print(testfunc(14))
