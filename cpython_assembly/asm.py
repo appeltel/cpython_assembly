@@ -20,7 +20,7 @@ def asm(f):
 
     argcount = 1
     kwonlyargcount = 0
-    nlocals = 1
+    nlocals = co_gen.co_nlocals
     stacksize = co_gen.co_stacksize
     flags = 67
     codestring = co_gen.co_code
@@ -48,7 +48,7 @@ def asm(f):
         lnotab
     )
 
-    result = types.FunctionType(co_out, globals())
+    result = types.FunctionType(co_out, f.__globals__) 
     result.__doc__ = doc
     result.__defaults__ = f.__defaults__
     return result
@@ -97,6 +97,7 @@ class Assembler:
         self.targets = {}
         self.code = None
         self.varnames = varnames
+        self.argcount = len(varnames)
         self.locals = list(varnames)
 
     def assemble(self):
@@ -110,9 +111,9 @@ class Assembler:
         self.assemble_code()
 
         return types.CodeType(
+            self.argcount,
+            0,
             len(self.varnames),
-            0,
-            0,
             self.stacksize,
             67,
             self.code,
@@ -200,7 +201,6 @@ class Assembler:
 
         self.bytecode = bytecode
         self._fix_arguments()
-
         self.code = bytes(bytecode)
 
     def _determine_argument(self, arg, opcode):

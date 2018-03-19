@@ -153,7 +153,7 @@ def test_fibonacci():
           LOAD_CONST               int1
           STORE_FAST               b
 
-          SETUP_LOOP               start_loop
+          SETUP_LOOP               after_loop
           LOAD_GLOBAL              range
           LOAD_FAST                n
           CALL_FUNCTION            1
@@ -176,5 +176,5 @@ def test_fibonacci():
           RETURN_VALUE
         """
 
-        assert fib(6) == 8
-        assert fib(7) == 13
+    assert fib(6) == 8
+    assert fib(7) == 13
