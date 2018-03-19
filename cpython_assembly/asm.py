@@ -18,34 +18,20 @@ def asm(f):
     machine = Assembler(source, co_in.co_varnames)
     co_gen = machine.assemble()
 
-    argcount = 1
-    kwonlyargcount = 0
-    nlocals = co_gen.co_nlocals
-    stacksize = co_gen.co_stacksize
-    flags = 67
-    codestring = co_gen.co_code
-    constants = co_gen.co_consts
-    names = co_gen.co_names
-    varnames = co_gen.co_varnames
-    name = co_in.co_name
-    filename = co_in.co_filename
-    firstlineno = co_in.co_firstlineno
-    lnotab = b'\x00\x01'
-    
     co_out = types.CodeType(
-        argcount,
-        kwonlyargcount,
-        nlocals,
-        stacksize,
-        flags,
-        codestring,
-        constants,
-        names,
-        varnames,
-        filename,
-        name,
-        firstlineno,
-        lnotab
+        len(co_in.co_varnames),
+        0,
+        co_gen.co_nlocals,
+        co_gen.co_stacksize,
+        67,
+        co_gen.co_code,
+        co_gen.co_consts,
+        co_gen.co_names,
+        co_gen.co_varnames,
+        co_in.co_filename,
+        co_in.co_filename,
+        co_in.co_firstlineno,
+        b'\x00\x01'
     )
 
     result = types.FunctionType(co_out, f.__globals__) 
