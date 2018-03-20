@@ -1,3 +1,5 @@
+![Travis CI Status](https://travis-ci.org/appeltel/cpython_assembly.svg?branch=master)
+
 # CPython Assembler
 
 Assembler for CPython bytecode into python functions
