@@ -6,7 +6,7 @@ python:
 
 install: "pip install -r test-requirements.txt"
 
-script: tox -e $(echo py$TRAVIS_PYTHON_VERSION | tr -d .)
+script: tox -e $(echo py$TRAVIS_PYTHON_VERSION | tr -d . | cut -d- -f 1)
 
 notifications:
   email: false
