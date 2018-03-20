@@ -2,6 +2,7 @@
 Still figuring out what I'm doing here
 """
 import cpython_assembly.asm as asm
+import dis
 
 SAMPLE_CODE = """\
 
@@ -175,6 +176,113 @@ def test_fibonacci():
           LOAD_FAST                a
           RETURN_VALUE
         """
+
+    assert fib(6) == 8
+    assert fib(7) == 13
+
+
+def test_fibonacci_high_args():
+
+    def fib(n):
+        """
+        Return the nth fibonacci number
+        :::asm
+
+        .stacksize 4
+        .locals a, b, idx
+        .names range
+        .consts
+          int0 = 0
+          int1 = 1
+
+        .code
+          LOAD_CONST               int0
+          STORE_FAST               a
+
+          LOAD_CONST               int1
+          STORE_FAST               b
+
+          SETUP_LOOP               after_loop
+        """
+
+    nops = ["NOP"]*500
+    fib.__doc__ += '\n'.join(nops)
+    fib.__doc__ += """
+          LOAD_GLOBAL              range
+          LOAD_FAST                n
+          CALL_FUNCTION            1
+          GET_ITER
+        start_loop:
+          FOR_ITER                 end_loop
+          STORE_FAST               idx
+          LOAD_FAST                b
+          LOAD_FAST                a
+          LOAD_FAST                b
+          BINARY_ADD
+          ROT_TWO
+          STORE_FAST               a
+          STORE_FAST               b
+          JUMP_ABSOLUTE            start_loop
+        end_loop:
+          POP_BLOCK
+        after_loop:
+          LOAD_FAST                a
+          RETURN_VALUE
+        """
+    fib = asm.asm(fib)
+
+    assert fib(6) == 8
+    assert fib(7) == 13
+
+def test_fibonacci_very_high_args():
+
+    def fib(n):
+        """
+        Return the nth fibonacci number
+        :::asm
+
+        .stacksize 4
+        .locals a, b, idx
+        .names range
+        .consts
+          int0 = 0
+          int1 = 1
+
+        .code
+          LOAD_CONST               int0
+          STORE_FAST               a
+
+          LOAD_CONST               int1
+          STORE_FAST               b
+
+          SETUP_LOOP               after_loop
+        """
+
+    nops = ["NOP"]*68000
+    fib.__doc__ += '\n'.join(nops)
+    fib.__doc__ += """
+          LOAD_GLOBAL              range
+          LOAD_FAST                n
+          CALL_FUNCTION            1
+          GET_ITER
+        start_loop:
+          FOR_ITER                 end_loop
+          STORE_FAST               idx
+          LOAD_FAST                b
+          LOAD_FAST                a
+          LOAD_FAST                b
+          BINARY_ADD
+          ROT_TWO
+          STORE_FAST               a
+          STORE_FAST               b
+          JUMP_ABSOLUTE            start_loop
+        end_loop:
+          POP_BLOCK
+        after_loop:
+          LOAD_FAST                a
+          RETURN_VALUE
+        """
+    fib = asm.asm(fib)
 
     assert fib(6) == 8
     assert fib(7) == 13

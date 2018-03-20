@@ -9,8 +9,8 @@ import types
 
 def asm(f):
     """
-    Decorator to assemble a function from a docstring in my imaginary asm format for
-    python bytecode
+    Decorator to assemble a function from a docstring in my imaginary asm
+    format for python bytecode
     """
     doc, source = f.__doc__.split(':::asm')
     co_in = f.__code__
@@ -228,6 +228,7 @@ class Assembler:
         Replace target tuples in bytecode with correct positions or
         variable indices
         """
+        # first pass, replace non-int arguments with integer values
         for idx in range(0, len(self.bytecode), 2):
             arg = self.bytecode[idx+1]
             if not isinstance(arg, tuple):
@@ -244,3 +245,58 @@ class Assembler:
                 self.bytecode[idx+1] = self.names.index(arg[1])
             elif arg[0] == 'const':
                 self.bytecode[idx+1] = self.consts_alias[arg[1]]
+
+        # second pass (quadratic), use EXTENDED_ARG ops as needed
+        # to reduce down arguments to < 256
+        reduced = False
+        while not reduced:
+            reduced = self._reduce_next_arg()
+
+    def _reduce_next_arg(self):
+        """
+        Locate the first instruction with an argument over 255 and
+        reduce it using EXTENDED_ARG
+        """
+        reduced = True
+        for idx in range(0, len(self.bytecode), 2):
+            arg = self.bytecode[idx+1]
+            if arg > 255:
+                reduced = False
+                if idx > 0 and idx-2 == opmap['EXTENDED_ARG']:
+                    self.bytecode[idx-1] += arg >> 8
+                    self.bytecode[idx+1] %= 256
+                else:
+                    self.bytecode[idx+1] %= 256
+                    self._insert_extended_arg(idx, arg >> 8)
+                break
+        return reduced
+
+    def _insert_extended_arg(self, pos, val):
+        """
+        Insert an EXTENDED_ARG opcode at position pos with argument val
+        Then adjust jabs and rel values.
+        """
+        self.bytecode.insert(pos, val)
+        self.bytecode.insert(pos, opmap['EXTENDED_ARG'])
+        for idx in range(0, pos, 2):
+            if (self.bytecode[idx] in hasjrel and 
+                self._get_full_arg(idx) + idx + 2 > pos
+            ):
+                self.bytecode[idx+1] += 2
+
+        for idx in range(0, len(self.bytecode), 2):
+            if self.bytecode[idx] in hasjabs and self._get_full_arg(idx) > pos:
+                self.bytecode[idx+1] += 2
+
+    def _get_full_arg(self, pos):
+        """
+        Get the full argument value (augmented by previous EXTENDED_ARG
+        instructions) of the instruction at position pos)
+        """
+        arg = self.bytecode[pos+1]
+        mult = 1
+        while pos > 0 and self.bytecode[pos-2] == opmap['EXTENDED_ARG']:
+            mult *= 256
+            arg += self.bytecode[pos-1] * mult
+            pos -= 2
+        return arg
