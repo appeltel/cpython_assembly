@@ -1,4 +1,5 @@
 ![Travis CI Status](https://travis-ci.org/appeltel/cpython_assembly.svg?branch=master)
+![python 3.6, 3.7](https://img.shields.io/badge/python-3.6%2C%203.7-brightgreen.svg)
 
 # CPython Assembler
 
