@@ -131,6 +131,16 @@ def test_assemble_names():
 
     assert machine.names == ('c', 'd', 'e', 'f', 'g', 'h')
 
+def test_assemble_flags():
+    machine = asm.Assembler()
+    machine.src['flags'] = [
+        'newlocals, OPTimized',
+        '0x40'
+    ]
+
+    machine.assemble_flags()
+
+    assert machine.flags == 67
 
 def test_fibonacci():
 
@@ -141,6 +151,7 @@ def test_fibonacci():
         :::asm
 
         .stacksize 4
+        .flags optimized, newlocals, nofree
         .locals a, b, idx
         .names range
         .consts
@@ -189,6 +200,7 @@ def test_fibonacci_high_args():
         :::asm
 
         .stacksize 4
+        .flags optimized, newlocals, nofree
         .locals a, b, idx
         .names range
         .consts
@@ -242,6 +254,7 @@ def test_fibonacci_very_high_args():
         :::asm
 
         .stacksize 4
+        .flags optimized, newlocals, nofree
         .locals a, b, idx
         .names range
         .consts

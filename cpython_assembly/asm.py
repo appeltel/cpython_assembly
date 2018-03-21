@@ -7,6 +7,19 @@ from dis import (
 )
 import types
 
+CO_FLAGS = {
+    'OPTIMIZED': 0x1,
+    'NEWLOCALS': 0x2,
+    'VARARGS': 0x4,
+    'VARKEYWORDS': 0x8,
+    'NESTED': 0x10,
+    'GENERATOR': 0x20,
+    'NOFREE': 0x40,
+    'COROUTINE': 0x80,
+    'ITERABLE_COROUTINE': 0x100,
+    'ASYNC_GENERATOR': 0x200
+}
+
 def asm(f):
     """
     Decorator to assemble a function from a docstring in my imaginary asm
@@ -23,12 +36,12 @@ def asm(f):
         0,
         co_gen.co_nlocals,
         co_gen.co_stacksize,
-        67,
+        co_gen.co_flags,
         co_gen.co_code,
         co_gen.co_consts,
         co_gen.co_names,
         co_gen.co_varnames,
-        co_in.co_filename,
+        co_in.co_name,
         co_in.co_filename,
         co_in.co_firstlineno,
         b'\x00\x01'
@@ -85,12 +98,14 @@ class Assembler:
         self.varnames = varnames
         self.argcount = len(varnames)
         self.locals = list(varnames)
+        self.flags = 0
 
     def assemble(self):
         """
         Assemble source into a types.CodeType object and return it
         """
         self.assemble_stacksize()
+        self.assemble_flags()
         self.assemble_locals()
         self.assemble_names()
         self.assemble_consts()
@@ -101,7 +116,7 @@ class Assembler:
             0,
             len(self.varnames),
             self.stacksize,
-            67,
+            self.flags,
             self.code,
             self.consts,
             self.names,
@@ -152,6 +167,22 @@ class Assembler:
             self.locals.extend([s.strip() for s in line.split(',')])
         self.varnames = tuple(self.locals)
 
+    def assemble_flags(self):
+        """
+        Flags can be given as the name of the flag or hexidecimal
+        literal, i.e. 0x4 
+
+        These can be multiple on one line, comma separated
+        """
+        for line in self.src.get('flags', ()):
+            flags = (s.strip() for s in line.split(','))
+            for flagstr in flags:
+                try:
+                    flag = int(flagstr, 16)
+                except ValueError:
+                    flag = CO_FLAGS[flagstr.upper()]
+                self.flags |= flag
+                
     def assemble_names(self):
         """
         Names

@@ -40,6 +40,7 @@ We'll get to that later, here's an example function
         :::asm
 
         .stacksize 4
+        .flags optimized, newlocals, nofree
         .locals a, b, idx
         .names range
         .consts
