@@ -142,6 +142,7 @@ def test_assemble_flags():
 
     assert machine.flags == 67
 
+
 def test_fibonacci():
 
     @asm.asm
@@ -190,6 +191,59 @@ def test_fibonacci():
 
     assert fib(6) == 8
     assert fib(7) == 13
+
+
+def test_fibonacci_generator():
+
+    @asm.asm
+    def fibgen(n):
+        """
+        Generate the fibonacci numbers
+        :::asm
+
+        .stacksize 4
+        .flags optimized, newlocals, nofree, generator
+        .locals a, b, idx
+        .names range
+        .consts
+          int0 = 0
+          int1 = 1
+          none = None
+
+        .code
+          LOAD_CONST               int0
+          STORE_FAST               a
+          LOAD_CONST               int1
+          STORE_FAST               b
+          SETUP_LOOP               after_loop
+          LOAD_GLOBAL              range
+          LOAD_FAST                n
+          CALL_FUNCTION            1
+          GET_ITER
+        start_loop:
+          FOR_ITER                 end_loop
+          STORE_FAST               idx
+          LOAD_FAST                b
+          LOAD_FAST                a
+          LOAD_FAST                b
+          BINARY_ADD
+          ROT_TWO
+          STORE_FAST               a
+          STORE_FAST               b
+          LOAD_FAST                a
+          YIELD_VALUE
+          POP_TOP
+          JUMP_ABSOLUTE            start_loop
+        end_loop:
+          POP_BLOCK
+        after_loop:
+          LOAD_CONST               none
+          RETURN_VALUE
+        """
+
+    nums = [x for x in fibgen(7)]
+
+    assert nums == [1, 1, 2, 3, 5, 8, 13]
 
 
 def test_fibonacci_high_args():
