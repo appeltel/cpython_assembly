@@ -94,7 +94,7 @@ def test_assemble_consts():
     machine.assemble_consts()
 
     assert machine.consts == (None, 4, 23.2, "foobar")
-    assert machine.consts_alias == {'none': 0, 'four': 1, 'string': 3}
+    assert machine.consts_alias == {'__doc__': 0, 'four': 1, 'string': 3}
 
 
 def test_assemble_stacksize():
@@ -191,6 +191,51 @@ def test_fibonacci():
 
     assert fib(6) == 8
     assert fib(7) == 13
+    assert fib.__doc__ == '\n        Return the nth fibonacci number\n        '
+    assert fib.__code__.co_consts[0] == (
+        '\n        Return the nth fibonacci number\n        '
+    )
+
+
+def test_fibonacci_kwonly():
+
+    @asm.asm
+    def fib(n, *, a, b):
+        """
+        Return the nth fibonacci number
+        :::asm
+
+        .stacksize 4
+        .flags optimized, newlocals, nofree
+        .locals idx
+        .names range
+
+        .code
+          SETUP_LOOP               after_loop
+          LOAD_GLOBAL              range
+          LOAD_FAST                n
+          CALL_FUNCTION            1
+          GET_ITER
+        start_loop:
+          FOR_ITER                 end_loop
+          STORE_FAST               idx
+          LOAD_FAST                b
+          LOAD_FAST                a
+          LOAD_FAST                b
+          BINARY_ADD
+          ROT_TWO
+          STORE_FAST               a
+          STORE_FAST               b
+          JUMP_ABSOLUTE            start_loop
+        end_loop:
+          POP_BLOCK
+        after_loop:
+          LOAD_FAST                a
+          RETURN_VALUE
+        """
+
+    assert fib(6, a=0, b=1) == 8
+    assert fib(7, a=0, b=1) == 13
 
 
 def test_fibonacci_generator():

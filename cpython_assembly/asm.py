@@ -28,12 +28,12 @@ def asm(f):
     doc, source = f.__doc__.split(':::asm')
     co_in = f.__code__
 
-    machine = Assembler(source, co_in.co_varnames)
+    machine = Assembler(source, co_in.co_varnames, doc=doc)
     co_gen = machine.assemble()
 
     co_out = types.CodeType(
-        len(co_in.co_varnames),
-        0,
+        co_in.co_argcount,
+        co_in.co_kwonlyargcount,
         co_gen.co_nlocals,
         co_gen.co_stacksize,
         co_gen.co_flags,
@@ -82,7 +82,7 @@ class Assembler:
     """
     I *think* I want to make this a class
     """
-    def __init__(self, source=None, varnames=()):
+    def __init__(self, source=None, varnames=(), doc=None):
         """
         Can be passed source to be preprocessed or
         you can add sections manually (mainly for
@@ -99,6 +99,7 @@ class Assembler:
         self.argcount = len(varnames)
         self.locals = list(varnames)
         self.flags = 0
+        self.doc = doc
 
     def assemble(self):
         """
@@ -142,11 +143,11 @@ class Assembler:
         and refer to it numerically in the assembly code.
 
         As with the CPython compiler, the first constant in the list
-        will always be None. This will be given the alias "none"
+        will be the docstring. This will be given the name "__doc__"
         """
-        consts = [None]
-        aliases = {'none': 0}
-        for idx, line in enumerate(self.src['consts']):
+        consts = [self.doc]
+        aliases = {'__doc__': 0}
+        for idx, line in enumerate(self.src.get('consts', ())):
             tokens = [t.strip() for t in line.split('=')]
             if len(tokens) == 1:
                 consts.append(eval(tokens[0]))
