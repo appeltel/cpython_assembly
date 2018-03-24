@@ -232,7 +232,12 @@ class Assembler:
             bytecode.append(opcode)
             bytecode_lno.append(lno)
             if opcode >= HAVE_ARGUMENT:
-                bytecode.append(self._determine_argument(tokens[1], opcode))
+                arg = tokens[1]
+                try:
+                    arg = int(arg)
+                except ValueError:
+                    pass
+                bytecode.append(arg)
             else:
                 bytecode.append(0)
             pos += 2
@@ -241,28 +246,6 @@ class Assembler:
         self.bytecode_lno = bytecode_lno
         self._fix_arguments()
         self.code = bytes(bytecode)
-
-    def _determine_argument(self, arg, opcode):
-        """
-        Determine what to do with an argument string depending on the opcode
-
-        If the argument is an integer convert and return it
-        """
-        try:
-            return int(arg)
-        except ValueError:
-            pass
-
-        if opcode in hasjabs:
-            return ('jabs', arg)
-        if opcode in hasjrel:
-            return ('jrel', arg)
-        if opcode in haslocal:
-            return ('local', arg)
-        if opcode in hasname:
-            return ('name', arg)
-        if opcode in hasconst:
-            return ('const', arg)
 
     def _extract_target(self, line, pos):
         """
@@ -284,20 +267,20 @@ class Assembler:
         # first pass, replace non-int arguments with integer values
         for idx in range(0, len(self.bytecode), 2):
             arg = self.bytecode[idx+1]
-            if not isinstance(arg, tuple):
+            if not isinstance(arg, str):
                 continue
-            if arg[0] == 'jabs':
-                self.bytecode[idx+1] = self.targets[arg[1]]
-            elif arg[0] == 'jrel':
+            if self.bytecode[idx] in hasjabs:
+                self.bytecode[idx+1] = self.targets[arg]
+            elif self.bytecode[idx] in hasjrel:
                 self.bytecode[idx+1] = (
-                    self.targets[arg[1]] - (idx + 2)
+                    self.targets[arg] - (idx + 2)
                 )
-            elif arg[0] == 'local':
-                self.bytecode[idx+1] = self.locals.index(arg[1])
-            elif arg[0] == 'name':
-                self.bytecode[idx+1] = self.names.index(arg[1])
-            elif arg[0] == 'const':
-                self.bytecode[idx+1] = self.consts_alias[arg[1]]
+            elif self.bytecode[idx] in haslocal:
+                self.bytecode[idx+1] = self.locals.index(arg)
+            elif self.bytecode[idx] in hasname:
+                self.bytecode[idx+1] = self.names.index(arg)
+            elif self.bytecode[idx] in hasconst:
+                self.bytecode[idx+1] = self.consts_alias[arg]
 
         # second pass (quadratic), use EXTENDED_ARG ops as needed
         # to reduce down arguments to < 256
