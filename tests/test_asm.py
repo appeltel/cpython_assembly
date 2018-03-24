@@ -3,6 +3,8 @@ Still figuring out what I'm doing here
 """
 import cpython_assembly.asm as asm
 import dis
+import traceback
+
 
 SAMPLE_CODE = """\
 
@@ -24,8 +26,8 @@ def test_preprocess():
 
     result = asm.preprocess(SAMPLE_CODE)
 
-    assert result['code'][0] == 'LOAD_FAST 0'
-    assert result['code'][3] == 'RETURN_VALUE'
+    assert result['code'][0][1] == 'LOAD_FAST 0'
+    assert result['code'][3][1] == 'RETURN_VALUE'
     assert len(result['code']) == 4
     assert result['consts'] == ['4']
     assert result['stacksize'] == ['2']
@@ -38,6 +40,8 @@ def test_assemble_code():
         'binary_add',
         'RETURN_VALUE'
     ]
+    # fake the line numbers
+    machine.src['code'] = enumerate(machine.src['code'])
 
     machine.assemble_code()
     assert machine.code == b'|\x00d\x01\x17\x00S\x00'
@@ -52,6 +56,8 @@ def test_assemble_code_targets():
         'binary_add',
         'baz: RETURN_VALUE'
     ]
+    # fake the line numbers
+    machine.src['code'] = enumerate(machine.src['code'])
 
     machine.assemble_code()
     assert machine.code == b'|\x00d\x01\x17\x00S\x00'
@@ -77,6 +83,8 @@ def test_assemble_code_target_positions():
         '  LOAD_FAST                0',
         '  RETURN_VALUE'
     ]
+    # fake the line numbers
+    machine.src['code'] = enumerate(machine.src['code'])
 
     machine.assemble_code()
 
@@ -398,3 +406,23 @@ def test_fibonacci_very_high_args():
 
     assert fib(6) == 8
     assert fib(7) == 13
+
+
+def test_lnotab_longbad():
+    """
+    Make sure the test module raising an exception
+    produces a valid traceback from lnotab
+    """
+    from tests.assets.longbad import bad
+
+    try:
+        bad(0)
+    except ValueError as e:
+        ex = e
+
+    tb = traceback.extract_tb(ex.__traceback__)[-1]
+
+    assert tb[0] == 'bad'
+    assert tb[1] == 350
+    assert tb[2].endswith('longbad.py')
+    assert tb[3] == 'RAISE_VARARGS            1'

@@ -28,7 +28,12 @@ def asm(f):
     doc, source = f.__doc__.split(':::asm')
     co_in = f.__code__
 
-    machine = Assembler(source, co_in.co_varnames, doc=doc)
+    machine = Assembler(
+        source,
+        co_in.co_varnames,
+        doc=doc,
+        fl=co_in.co_firstlineno
+    )
     co_gen = machine.assemble()
 
     co_out = types.CodeType(
@@ -43,8 +48,8 @@ def asm(f):
         co_gen.co_varnames,
         co_in.co_name,
         co_in.co_filename,
-        co_in.co_firstlineno,
-        b'\x00\x01'
+        co_gen.co_firstlineno,
+        co_gen.co_lnotab
     )
 
     result = types.FunctionType(co_out, f.__globals__) 
@@ -55,7 +60,8 @@ def asm(f):
 
 def preprocess(source):
     """
-    Remove comments, dedent, split into lines and sections
+    Remove comments, dedent, split into lines and sections, record line
+    numbers with each line for the code section
 
     allow first line of section to be after the section header,
     for example ``.stacksize 4``
@@ -63,7 +69,7 @@ def preprocess(source):
     lines = [line.split(';')[0].strip() for line in source.splitlines()]
     sections = {'unknown': []}
     current_section = 'unknown'
-    for line in lines:
+    for lno, line in enumerate(lines):
         if not line:
             continue
         if line.startswith('.'):
@@ -71,9 +77,15 @@ def preprocess(source):
                 sections[tokens[0]] = []
                 current_section = tokens[0]
                 if len(tokens) > 1:
-                    sections[tokens[0]].append(''.join(tokens[1:]))
+                    if current_section == 'code':
+                        sections[tokens[0]].append((lno, ''.join(tokens[1:])))
+                    else:
+                        sections[tokens[0]].append(''.join(tokens[1:]))
                 continue
-        sections[current_section].append(line)
+        if current_section == 'code':
+            sections[current_section].append((lno, line))
+        else:
+            sections[current_section].append(line)
 
     return sections
 
@@ -82,7 +94,7 @@ class Assembler:
     """
     I *think* I want to make this a class
     """
-    def __init__(self, source=None, varnames=(), doc=None):
+    def __init__(self, source=None, varnames=(), doc=None, fl=0):
         """
         Can be passed source to be preprocessed or
         you can add sections manually (mainly for
@@ -100,6 +112,11 @@ class Assembler:
         self.locals = list(varnames)
         self.flags = 0
         self.doc = doc
+        self.fl = fl
+        if doc is not None:
+            self.lnodoc = len(doc.splitlines())
+        else:
+            self.lnodoc = 0
 
     def assemble(self):
         """
@@ -111,6 +128,7 @@ class Assembler:
         self.assemble_names()
         self.assemble_consts()
         self.assemble_code()
+        self.assemble_lnotab()
 
         return types.CodeType(
             self.argcount,
@@ -124,8 +142,8 @@ class Assembler:
             self.varnames,
             '',
             '',
-            0,
-            b''
+            self.fl,
+            self.lnotab
         )
 
     def assemble_stacksize(self):
@@ -200,8 +218,9 @@ class Assembler:
         Assuming everything else has gone correctly, produce the bytecode
         """
         bytecode = []
+        bytecode_lno = []
         pos = 0
-        for line in self.src['code']:
+        for lno, line in self.src['code']:
 
             line = self._extract_target(line, pos)
             if not line:
@@ -211,6 +230,7 @@ class Assembler:
             op = tokens[0].upper()
             opcode = opmap[op]
             bytecode.append(opcode)
+            bytecode_lno.append(lno)
             if opcode >= HAVE_ARGUMENT:
                 bytecode.append(self._determine_argument(tokens[1], opcode))
             else:
@@ -218,6 +238,7 @@ class Assembler:
             pos += 2
 
         self.bytecode = bytecode
+        self.bytecode_lno = bytecode_lno
         self._fix_arguments()
         self.code = bytes(bytecode)
 
@@ -310,6 +331,7 @@ class Assembler:
         """
         self.bytecode.insert(pos, val)
         self.bytecode.insert(pos, opmap['EXTENDED_ARG'])
+        self.bytecode_lno.insert(pos // 2, 0)
         for idx in range(0, pos, 2):
             if (self.bytecode[idx] in hasjrel and 
                 self._get_full_arg(idx) + idx + 2 > pos
@@ -332,3 +354,29 @@ class Assembler:
             arg += self.bytecode[pos-1] * mult
             pos -= 2
         return arg
+
+    def assemble_lnotab(self):
+        """
+        This is a hot mess
+        """
+        lnotab = []
+        current = 0
+        dist = 2
+        last_entry = 0
+        for entry in self.bytecode_lno:
+            if entry == 0:
+                dist += 2
+                continue
+            entry += self.lnodoc + 1
+            more_entry = 0
+            while entry - last_entry > 127:
+                lnotab.append(0)
+                lnotab.append(127)
+                entry -= 127; more_entry += 127
+            lnotab.append(current)
+            lnotab.append(entry - last_entry)
+            last_entry = entry + more_entry
+            current = dist
+            dist = 2
+
+        self.lnotab = bytes(lnotab)
