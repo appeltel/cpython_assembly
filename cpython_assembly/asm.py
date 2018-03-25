@@ -49,7 +49,7 @@ def _asm(f, *args):
         source,
         co_in.co_varnames,
         doc=doc,
-        fl=co_in.co_firstlineno,
+        code=co_in,
         args=args
     )
     co_gen = machine.assemble()
@@ -122,25 +122,29 @@ class Assembler:
     """
     I *think* I want to make this a class
     """
-    def __init__(self, source=None, varnames=(), doc=None, fl=0, args=None):
+    def __init__(self, source=None, varnames=(), doc=None, code=None, args=None):
         """
         Can be passed source to be preprocessed or
         you can add sections manually (mainly for
-        testing convenience) 
+        testing convenience)
         """
         if source is not None:
             self.src = preprocess(source)
         else:
             self.src = {}
 
+        self.flags = 0
+        self.fl = 0
+        if code is not None:
+            self.fl = code.co_firstlineno
+            self.flags = code.co_flags
+
         self.targets = {}
         self.code = None
         self.varnames = varnames
         self.argcount = len(varnames)
         self.locals = list(varnames)
-        self.flags = 0
         self.doc = doc
-        self.fl = fl
         self.args = args
         if doc is not None:
             self.lnodoc = len(doc.splitlines())
@@ -227,6 +231,9 @@ class Assembler:
 
         These can be multiple on one line, comma separated
         """
+        if 'flags' not in self.src:
+            return
+
         for line in self.src.get('flags', ()):
             flags = (s.strip() for s in line.split(','))
             for flagstr in flags:

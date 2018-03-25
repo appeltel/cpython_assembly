@@ -205,6 +205,56 @@ def test_fibonacci():
     )
 
 
+def test_fibonacci_no_flags():
+
+    @asm.asm
+    def fib(n):
+        """
+        Return the nth fibonacci number
+        :::asm
+
+        .stacksize 4
+        .locals a, b, idx
+        .names range
+        .consts
+          int0 = 0
+          int1 = 1
+
+        .code
+          LOAD_CONST               int0
+          STORE_FAST               a
+
+          LOAD_CONST               int1
+          STORE_FAST               b
+
+          SETUP_LOOP               after_loop
+          LOAD_GLOBAL              range
+          LOAD_FAST                n
+          CALL_FUNCTION            1
+          GET_ITER
+        start_loop:
+          FOR_ITER                 end_loop
+          STORE_FAST               idx
+          LOAD_FAST                b
+          LOAD_FAST                a
+          LOAD_FAST                b
+          BINARY_ADD
+          ROT_TWO
+          STORE_FAST               a
+          STORE_FAST               b
+          JUMP_ABSOLUTE            start_loop
+        end_loop:
+          POP_BLOCK
+        after_loop:
+          LOAD_FAST                a
+          RETURN_VALUE
+        """
+
+    assert fib(6) == 8
+    assert fib(7) == 13
+    assert fib.__code__.co_flags == 83 # this gets the nested flag (16)
+
+
 def test_fibonacci_kwonly():
 
     @asm.asm
