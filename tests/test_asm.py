@@ -426,3 +426,13 @@ def test_lnotab_longbad():
     assert tb[1] == 350
     assert tb[2].endswith('longbad.py')
     assert tb[3] == 'RAISE_VARARGS            1'
+
+
+def test_closure_metafib():
+    from tests.assets.metafib import metafib
+
+    fib = metafib(0, 1)
+
+
+    assert fib(6) == 8
+    assert fib(7) == 13

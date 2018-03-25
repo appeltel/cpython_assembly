@@ -3,7 +3,8 @@ Let's do this!
 
 """
 from dis import (
-    opmap, HAVE_ARGUMENT, hasjrel, hasjabs, haslocal, hasname, hasconst
+    opmap, HAVE_ARGUMENT,
+    hasjrel, hasjabs, haslocal, hasname, hasconst, hasfree
 )
 import types
 
@@ -20,10 +21,25 @@ CO_FLAGS = {
     'ASYNC_GENERATOR': 0x200
 }
 
-def asm(f):
+
+def asm(*args):
     """
     Decorator to assemble a function from a docstring in my imaginary asm
     format for python bytecode
+    """
+    if len(args) == 1 and callable(args[0]):
+        return _asm(args[0], ())
+
+    else:
+        def decor(f):
+            return _asm(f, *args)
+
+        return decor
+
+
+def _asm(f, *args):
+    """
+    Interior decorator 
     """
     doc, source = f.__doc__.split(':::asm')
     co_in = f.__code__
@@ -32,7 +48,8 @@ def asm(f):
         source,
         co_in.co_varnames,
         doc=doc,
-        fl=co_in.co_firstlineno
+        fl=co_in.co_firstlineno,
+        args=args
     )
     co_gen = machine.assemble()
 
@@ -49,12 +66,22 @@ def asm(f):
         co_in.co_name,
         co_in.co_filename,
         co_gen.co_firstlineno,
-        co_gen.co_lnotab
+        co_gen.co_lnotab,
+        co_gen.co_freevars,
+        co_gen.co_cellvars
     )
 
-    result = types.FunctionType(co_out, f.__globals__) 
+    # feel kinda iffy about this
+    if co_gen.co_freevars:
+        return co_out
+
+    result = types.FunctionType(
+        code=co_out,
+        globals=f.__globals__,
+        argdefs=f.__defaults__,
+        name=co_in.co_name,
+    ) 
     result.__doc__ = doc
-    result.__defaults__ = f.__defaults__
     return result
 
 
@@ -94,7 +121,7 @@ class Assembler:
     """
     I *think* I want to make this a class
     """
-    def __init__(self, source=None, varnames=(), doc=None, fl=0):
+    def __init__(self, source=None, varnames=(), doc=None, fl=0, args=None):
         """
         Can be passed source to be preprocessed or
         you can add sections manually (mainly for
@@ -113,6 +140,7 @@ class Assembler:
         self.flags = 0
         self.doc = doc
         self.fl = fl
+        self.args = args
         if doc is not None:
             self.lnodoc = len(doc.splitlines())
         else:
@@ -126,6 +154,8 @@ class Assembler:
         self.assemble_flags()
         self.assemble_locals()
         self.assemble_names()
+        self.assemble_freevars()
+        self.assemble_cellvars()
         self.assemble_consts()
         self.assemble_code()
         self.assemble_lnotab()
@@ -143,7 +173,9 @@ class Assembler:
             '',
             '',
             self.fl,
-            self.lnotab
+            self.lnotab,
+            self.freevars,
+            self.cellvars
         )
 
     def assemble_stacksize(self):
@@ -167,6 +199,7 @@ class Assembler:
         aliases = {'__doc__': 0}
         for idx, line in enumerate(self.src.get('consts', ())):
             tokens = [t.strip() for t in line.split('=')]
+            args = self.args
             if len(tokens) == 1:
                 consts.append(eval(tokens[0]))
             else:
@@ -212,6 +245,28 @@ class Assembler:
         for line in self.src.get('names', ()):
             names.extend([s.strip() for s in line.split(',')])
         self.names = tuple(names)
+
+    def assemble_freevars(self):
+        """
+        Closure stuff
+
+        These can be multiple on one line, comma separated
+        """
+        freevars = []
+        for line in self.src.get('freevars', ()):
+            freevars.extend([s.strip() for s in line.split(',')])
+        self.freevars = tuple(freevars)
+
+    def assemble_cellvars(self):
+        """
+        Closure stuff
+
+        These can be multiple on one line, comma separated
+        """
+        cellvars = []
+        for line in self.src.get('cellvars', ()):
+            cellvars.extend([s.strip() for s in line.split(',')])
+        self.cellvars = tuple(cellvars)
 
     def assemble_code(self):
         """
@@ -281,12 +336,23 @@ class Assembler:
                 self.bytecode[idx+1] = self.names.index(arg)
             elif self.bytecode[idx] in hasconst:
                 self.bytecode[idx+1] = self.consts_alias[arg]
+            elif self.bytecode[idx] in hasfree:
+                self.bytecode[idx+1] = self._find_freecell(arg)
 
         # second pass (quadratic), use EXTENDED_ARG ops as needed
         # to reduce down arguments to < 256
         reduced = False
         while not reduced:
             reduced = self._reduce_next_arg()
+
+    def _find_freecell(self, arg):
+        """
+        Locate the free/cell index of the free/cell variable by name
+        """
+        if arg in self.cellvars:
+            return self.cellvars.index(arg)
+        if arg in self.freevars:
+            return self.freevars.index(arg) + len(self.cellvars)
 
     def _reduce_next_arg(self):
         """
