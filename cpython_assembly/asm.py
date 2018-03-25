@@ -4,7 +4,8 @@ Let's do this!
 """
 from dis import (
     opmap, HAVE_ARGUMENT,
-    hasjrel, hasjabs, haslocal, hasname, hasconst, hasfree
+    hasjrel, hasjabs, haslocal, hasname, hasconst, hasfree,
+    get_instructions
 )
 import types
 
@@ -429,3 +430,42 @@ class Assembler:
             dist = 2
 
         self.lnotab = bytes(lnotab)
+
+
+def dis(func):
+    """
+    Disassemble a function into cpython_assembly format
+    """
+    co = func.__code__
+    result = []
+
+    if func.__doc__:
+        for line in func.__doc__.splitlines():
+            result.append(line)
+    result.append('    :::asm')
+
+    result.append('    .stacksize {0}'.format(co.co_stacksize))
+    flags = []
+    for key in CO_FLAGS:
+        if co.co_flags & CO_FLAGS[key]:
+            flags.append(key.lower())
+    result.append('    .flags {0}'.format(', '.join(flags)))
+
+    result.append('    .code')
+    for inst in get_instructions(func):
+        if inst.is_jump_target:
+            result.append('    t{0}:'.format(inst.offset))
+        if inst.opcode in hasjabs or inst.opcode in hasjrel:
+            arg = 't{0}'.format(inst.argval)
+            comment = ''
+        elif inst.arg is not None:
+            arg = inst.arg % 256
+            comment = '; ({0})'.format(inst.argrepr)
+        else:
+            arg = ''
+            comment = ''
+
+        result.append(
+            '      {0: <25} {1} {2}'.format(inst.opname, arg, comment)
+        )
+    return '\n'.join(result)
