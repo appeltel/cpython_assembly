@@ -47,7 +47,6 @@ def _asm(f, *args):
 
     machine = Assembler(
         source,
-        co_in.co_varnames,
         doc=doc,
         code=co_in,
         args=args
@@ -122,7 +121,7 @@ class Assembler:
     """
     I *think* I want to make this a class
     """
-    def __init__(self, source=None, varnames=(), doc=None, code=None, args=None):
+    def __init__(self, source=None, doc=None, code=None, args=None):
         """
         Can be passed source to be preprocessed or
         you can add sections manually (mainly for
@@ -135,15 +134,16 @@ class Assembler:
 
         self.flags = 0
         self.fl = 0
+        self.varnames = ()
         if code is not None:
             self.fl = code.co_firstlineno
             self.flags = code.co_flags
+            self.varnames = code.co_varnames
 
         self.targets = {}
         self.code = None
-        self.varnames = varnames
-        self.argcount = len(varnames)
-        self.locals = list(varnames)
+        self.argcount = len(self.varnames)
+        self.locals = list(self.varnames)
         self.doc = doc
         self.args = args
         if doc is not None:
@@ -157,6 +157,7 @@ class Assembler:
         """
         self.assemble_stacksize()
         self.assemble_flags()
+        self.assemble_params()
         self.assemble_locals()
         self.assemble_names()
         self.assemble_freevars()
@@ -213,6 +214,19 @@ class Assembler:
 
         self.consts = tuple(consts)
         self.consts_alias = aliases
+
+    def assemble_params(self):
+        """
+        Function parameters. These can either be specified
+        in a "params" directive or just taken from the initial
+        function. 
+
+        These can be multiple on one line, comma separated
+        """
+        for line in self.src.get('params', ()):
+            self.locals.extend([s.strip() for s in line.split(',')])
+        self.varnames = tuple(self.locals)
+        self.argcount = len(self.varnames)
 
     def assemble_locals(self):
         """

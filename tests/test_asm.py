@@ -114,18 +114,20 @@ def test_assemble_stacksize():
     assert machine.stacksize == 10
 
 
-def test_assemble_locals():
-    machine = asm.Assembler(varnames=('a', 'b'))
+def test_assemble_locals_and_params():
+    machine = asm.Assembler()
+    machine.src['params'] = ['a', 'b']
     machine.src['locals'] = [
         'c, d, e',
         'f, g',
         'h'
     ]
 
+    machine.assemble_params()
     machine.assemble_locals()
 
     assert machine.varnames == ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
-
+    assert machine.argcount == 2
 
 def test_assemble_names():
     machine = asm.Assembler()
